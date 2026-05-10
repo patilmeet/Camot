@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RemoteCam — Device</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500&family=Bebas+Neue&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:      #080b14;
+  --bg2:     #0d1120;
+  --surface: #111828;
+  --s2:      #18202f;
+  --border:  #1e2a3a;
+  --b2:      #243040;
+  --gold:    #f5c842;
+  --gold-d:  rgba(245,200,66,.13);
+  --blue:    #4f9eff;
+  --blue-d:  rgba(79,158,255,.12);
+  --green:   #3de8a0;
+  --green-d: rgba(61,232,160,.1);
+  --red:     #ff5566;
+  --red-d:   rgba(255,85,102,.12);
+  --amber:   #ffad3b;
+  --text:    #a8b8cc;
+  --text2:   #6b7f96;
+  --head:    #e2eaf5;
+  --mono:    'Fira Code', monospace;
+  --sans:    'Space Grotesk', sans-serif;
+  --display: 'Bebas Neue', sans-serif;
+}
+
+html, body { height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  overflow-x: hidden;
+}
+
+/* grid bg */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(79,158,255,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(79,158,255,.025) 1px, transparent 1px);
+  background-size: 44px 44px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── LOGIN ── */
+#login-screen {
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg);
+}
+.login-wrap {
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column; align-items: center; gap: 0;
+  width: 100%; max-width: 420px; padding: 20px;
+}
+.login-hero {
+  font-family: var(--display);
+  font-size: clamp(44px, 10vw, 68px);
+  color: var(--head); letter-spacing: .06em; line-height: 1;
+  margin-bottom: 4px; text-align: center;
+}
+.login-hero span { color: var(--blue); }
+.login-tag {
+  font-family: var(--mono); font-size: 11px;
+  letter-spacing: .22em; color: var(--text2);
+  text-transform: uppercase; margin-bottom: 32px; text-align: center;
+}
+.login-box {
+  width: 100%; background: var(--surface);
+  border: 1px solid var(--b2); border-radius: 16px;
+  padding: 32px 28px; position: relative; overflow: hidden;
+}
+.login-box::before, .login-box::after {
+  content: ''; position: absolute;
+  width: 52px; height: 52px;
+  border-color: var(--blue); border-style: solid;
+}
+.login-box::before { top:0;left:0; border-width:2px 0 0 2px; border-radius:16px 0 0 0; }
+.login-box::after  { bottom:0;right:0; border-width:0 2px 2px 0; border-radius:0 0 16px 0; }
+.login-lbl {
+  font-family: var(--mono); font-size: 11px;
+  letter-spacing: .18em; color: var(--text2); text-transform: uppercase;
+  margin-bottom: 18px; text-align: center;
+}
+.btn-google {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  width: 100%; padding: 14px 20px;
+  background: var(--head); color: #0a0c0f;
+  border: none; border-radius: 8px;
+  font-family: var(--sans); font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: all .2s;
+}
+.btn-google:hover {
+  background: #fff;
+  box-shadow: 0 0 36px rgba(79,158,255,.3), 0 4px 20px rgba(0,0,0,.3);
+  transform: translateY(-2px);
+}
+.login-note {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--text2); margin-top: 16px; text-align: center; letter-spacing:.06em;
+}
+
+/* ── APP ── */
+#app {
+  display: none; position: relative; z-index: 1;
+  min-height: 100vh; flex-direction: column;
+}
+
+/* ── TOPBAR ── */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 28px; height: 56px;
+  background: rgba(8,11,20,.93); backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-left { display: flex; align-items: center; gap: 18px; }
+.logo { font-family: var(--display); font-size: 20px; color: var(--head); letter-spacing:.1em; }
+.logo span { color: var(--blue); }
+.badge {
+  font-family: var(--mono); font-size: 10px; letter-spacing:.12em;
+  background: var(--blue-d); border: 1px solid rgba(79,158,255,.3);
+  color: var(--blue); border-radius: 4px; padding: 3px 10px; text-transform:uppercase;
+}
+.status-row { display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 11px; color: var(--text2); letter-spacing:.1em; text-transform:uppercase; }
+.status-dot { width:8px;height:8px;border-radius:50%;background:var(--text2);flex-shrink:0; }
+.status-row.listening .status-dot { background:var(--green); box-shadow:0 0 8px var(--green); animation: breathe 2s ease-in-out infinite; }
+.status-row.listening { color: var(--green); }
+.status-row.busy .status-dot { background:var(--amber); box-shadow:0 0 8px var(--amber); animation: breathe 1s ease-in-out infinite; }
+.status-row.busy { color: var(--amber); }
+@keyframes breathe { 0%,100%{opacity:1}50%{opacity:.4} }
+
+.topbar-right { display:flex;align-items:center;gap:14px; }
+.user-chip {
+  display:flex;align-items:center;gap:9px;
+  background:var(--surface);border:1px solid var(--border);border-radius:100px;padding:4px 14px 4px 4px;
+}
+.user-avatar { width:26px;height:26px;border-radius:50%;object-fit:cover;border:1px solid var(--b2); }
+.user-nm { font-size:13px;font-weight:500;color:var(--head);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.btn-out {
+  font-family:var(--mono);font-size:11px;letter-spacing:.1em;background:none;
+  border:1px solid var(--border);color:var(--text2);border-radius:6px;padding:6px 14px;cursor:pointer;transition:all .15s;text-transform:uppercase;
+}
+.btn-out:hover { color:var(--red);border-color:var(--red);background:var(--red-d); }
+
+/* ── LAYOUT ── */
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  min-height: calc(100vh - 56px);
+}
+
+/* ── CAMERA PANEL ── */
+.cam-panel {
+  padding: 24px; display: flex; flex-direction: column; gap: 16px;
+  background: var(--bg);
+}
+
+.cam-header {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.cam-title {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--text2);
+  display: flex; align-items: center; gap: 10px;
+}
+.cam-title .ind { width:6px;height:6px;border-radius:50%;background:var(--red);
+  box-shadow:0 0 6px var(--red); animation: breathe 1s infinite; }
+.cam-title .ind.off { background:var(--border);box-shadow:none;animation:none; }
+
+.cam-controls { display: flex; gap: 8px; }
+.ctrl-btn {
+  font-family: var(--mono); font-size: 11px; letter-spacing:.08em;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text2); border-radius: 6px; padding: 7px 14px;
+  cursor: pointer; transition: all .15s; text-transform: uppercase;
+}
+.ctrl-btn:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-d); }
+.ctrl-btn.active { border-color: var(--blue); color: var(--blue); background: var(--blue-d); }
+.ctrl-btn.danger:hover { border-color: var(--red); color: var(--red); background: var(--red-d); }
+
+/* Viewfinder */
+.viewfinder-wrap {
+  position: relative;
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  flex: 1;
+  min-height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#video {
+  width: 100%; height: 100%;
+  object-fit: cover; display: block;
+  transform: scaleX(-1); /* mirror front cam feel */
+}
+
+#video.rear { transform: scaleX(1); }
+
+#snapshot-canvas { display: none; }
+
+/* Corner brackets on viewfinder */
+.corner { position: absolute; width: 28px; height: 28px; z-index: 2; }
+.corner.tl { top: 14px; left: 14px; border-top: 2px solid var(--blue); border-left: 2px solid var(--blue); border-radius: 4px 0 0 0; }
+.corner.tr { top: 14px; right: 14px; border-top: 2px solid var(--blue); border-right: 2px solid var(--blue); border-radius: 0 4px 0 0; }
+.corner.bl { bottom: 14px; left: 14px; border-bottom: 2px solid var(--blue); border-left: 2px solid var(--blue); border-radius: 0 0 0 4px; }
+.corner.br { bottom: 14px; right: 14px; border-bottom: 2px solid var(--blue); border-right: 2px solid var(--blue); border-radius: 0 0 4px 0; }
+
+/* Center crosshair */
+.crosshair {
+  position: absolute; z-index: 2; pointer-events: none;
+  width: 40px; height: 40px;
+}
+.crosshair::before, .crosshair::after {
+  content: ''; position: absolute; background: rgba(255,255,255,.4);
+}
+.crosshair::before { top: 50%; left: 0; right: 0; height: 1px; transform: translateY(-50%); }
+.crosshair::after  { left: 50%; top: 0; bottom: 0; width: 1px; transform: translateX(-50%); }
+
+/* Flash effect */
+.flash-overlay {
+  position: absolute; inset: 0; background: white; z-index: 10;
+  opacity: 0; pointer-events: none; border-radius: 14px;
+  transition: opacity .05s;
+}
+.flash-overlay.flash { opacity: 1; }
+
+.cam-off-msg {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  color: var(--text2);
+}
+.cam-off-icon { font-size: 52px; opacity: .2; }
+.cam-off-txt {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .12em;
+  text-transform: uppercase; text-align: center; line-height: 1.9;
+}
+
+/* Remote shutter animation */
+.shutter-ring {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  width: 80px; height: 80px; border-radius: 50%;
+  border: 3px solid var(--gold);
+  z-index: 5; pointer-events: none;
+  opacity: 0;
+}
+.shutter-ring.fire {
+  animation: shutter-pop .6s ease-out forwards;
+}
+@keyframes shutter-pop {
+  0%   { transform: translate(-50%,-50%) scale(0); opacity: 1; }
+  100% { transform: translate(-50%,-50%) scale(2.5); opacity: 0; }
+}
+
+.cam-footer {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+
+.cam-facingbtn {
+  display: flex; gap: 8px;
+}
+.face-btn {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text2); border-radius: 8px; padding: 10px 18px;
+  cursor: pointer; transition: all .15s; text-transform: uppercase;
+  display: flex; align-items: center; gap: 8px;
+}
+.face-btn:hover { border-color: var(--b2); }
+.face-btn.active { border-color: var(--gold); color: var(--gold); background: var(--gold-d); }
+
+.manual-capture-btn {
+  background: var(--gold); color: #000;
+  border: none; border-radius: 8px; padding: 10px 24px;
+  font-family: var(--sans); font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .18s;
+  display: flex; align-items: center; gap: 8px;
+}
+.manual-capture-btn:hover { background: #ffd63a; box-shadow: 0 0 24px rgba(245,200,66,.4); transform: translateY(-1px); }
+.manual-capture-btn:disabled { opacity: .4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* ── SIDE PANEL ── */
+.side-panel {
+  border-left: 1px solid var(--border);
+  background: var(--bg2);
+  padding: 24px 20px;
+  display: flex; flex-direction: column; gap: 20px;
+  overflow-y: auto;
+}
+
+.s-label {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .22em;
+  text-transform: uppercase; color: var(--text2);
+  display: flex; align-items: center; gap: 10px; margin-bottom: 2px;
+}
+.s-label::after { content:'';flex:1;height:1px;background:var(--border); }
+
+/* Device info */
+.info-grid {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.info-row {
+  display: flex; align-items: baseline; gap: 10px;
+  font-family: var(--mono); font-size: 12px; padding: 8px 12px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+}
+.info-key { color: var(--text2); min-width: 90px; font-size: 11px; letter-spacing:.06em; }
+.info-val { color: var(--head); word-break: break-all; }
+
+/* Last capture preview */
+.preview-wrap {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; overflow: hidden;
+}
+.preview-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  font-family: var(--mono); font-size: 10px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--text2);
+}
+.preview-body {
+  background: var(--bg2); min-height: 160px;
+  display: flex; align-items: center; justify-content: center;
+}
+#preview-img {
+  max-width: 100%; max-height: 220px; object-fit: contain; display: none;
+}
+.preview-empty {
+  font-family: var(--mono); font-size: 11px; color: var(--text2);
+  letter-spacing: .1em; text-align: center; opacity: .5;
+}
+
+/* Command history / log */
+.log-wrap {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; overflow: hidden; flex: 1;
+}
+.log-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  font-family: var(--mono); font-size: 10px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--text2);
+}
+.btn-clr {
+  font-family: var(--mono); font-size: 10px; letter-spacing:.08em;
+  background: none; border: 1px solid var(--border); color: var(--text2);
+  border-radius: 4px; padding: 3px 10px; cursor: pointer; text-transform: uppercase;
+  transition: all .15s;
+}
+.btn-clr:hover { color: var(--red); border-color: rgba(255,85,102,.4); }
+#log-out {
+  padding: 12px 14px; font-family: var(--mono); font-size: 11px;
+  line-height: 2; max-height: 260px; overflow-y: auto; color: var(--text2);
+}
+#log-out::-webkit-scrollbar { width:3px; }
+#log-out::-webkit-scrollbar-thumb { background:var(--b2);border-radius:3px; }
+.ll { display:flex;gap:12px;align-items:baseline; }
+.lt { color:var(--border);flex-shrink:0;font-size:10px; }
+.ll.ok   .lm { color:var(--green); }
+.ll.warn .lm { color:var(--gold); }
+.ll.err  .lm { color:var(--red); }
+.ll.info .lm { color:var(--text); }
+.ll.cmd  .lm { color:var(--blue); }
+
+/* Config */
+.cfg-field { display:flex;flex-direction:column;gap:6px; }
+.cfg-lbl { font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text2); }
+.cfg-inp {
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:10px 14px;color:var(--head);font-family:var(--mono);font-size:13px;
+  outline:none;transition:border-color .15s,box-shadow .15s;width:100%;
+}
+.cfg-inp:focus { border-color:var(--blue);box-shadow:0 0 0 3px rgba(79,158,255,.1); }
+
+/* Toast */
+#toast {
+  position:fixed;bottom:24px;right:24px;z-index:999;
+  font-family:var(--mono);font-size:12px;letter-spacing:.06em;
+  padding:11px 18px;border-radius:10px;border:1px solid var(--border);
+  background:var(--s2);color:var(--text);
+  transform:translateY(60px) scale(.96);opacity:0;
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);pointer-events:none;
+}
+#toast.show{transform:none;opacity:1;}
+#toast.ok{border-color:rgba(61,232,160,.35);color:var(--green);}
+#toast.err{border-color:rgba(255,85,102,.35);color:var(--red);}
+#toast.warn{border-color:rgba(245,200,66,.35);color:var(--gold);}
+
+/* Processing overlay on viewfinder */
+.processing-bar {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
+  background: var(--gold); z-index: 8; display: none;
+  animation: progress-anim 1.5s ease-in-out infinite;
+}
+@keyframes progress-anim {
+  0%   { transform: scaleX(0); transform-origin: left; }
+  50%  { transform: scaleX(1); transform-origin: left; }
+  51%  { transform: scaleX(1); transform-origin: right; }
+  100% { transform: scaleX(0); transform-origin: right; }
+}
+.processing-bar.show { display: block; }
+
+/* Remote command flash badge */
+.cmd-badge {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  background: rgba(245,200,66,.95); color: #000;
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  letter-spacing: .1em; text-transform: uppercase;
+  padding: 6px 18px; border-radius: 100px; z-index: 8;
+  opacity: 0; transition: opacity .2s; pointer-events: none;
+  white-space: nowrap;
+}
+.cmd-badge.show { opacity: 1; }
+
+/* Responsive */
+@media(max-width:860px){
+  .layout{grid-template-columns:1fr;}
+  .side-panel{border-left:none;border-top:1px solid var(--border);max-height:460px;}
+  .topbar{padding:0 14px;}
+  .user-nm{display:none;}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ LOGIN ═══ -->
+<div id="login-screen">
+  <div class="login-wrap">
+    <div class="login-hero">REMOTE<span>CAM</span></div>
+    <div class="login-tag">Device App · Open on target device</div>
+    <div class="login-box">
+      <div class="login-lbl">Sign in to activate this device</div>
+      <button class="btn-google" id="btn-google-login">
+        <svg width="18" height="18" viewBox="0 0 48 48">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        </svg>
+        Continue with Google
+      </button>
+      <div class="login-note">Must use the same Google account as the dashboard</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ APP ═══ -->
+<div id="app">
+
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="logo">REMOTE<span>CAM</span></div>
+      <div class="badge">DEVICE</div>
+      <div class="status-row" id="status-row">
+        <div class="status-dot"></div>
+        <span id="status-txt">WAITING FOR CAMERA</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="user-chip">
+        <img class="user-avatar" id="user-avatar" src="" alt="" />
+        <span class="user-nm" id="user-name"></span>
+      </div>
+      <button class="btn-out" id="btn-signout">Sign Out</button>
+    </div>
+  </div>
+
+  <div class="layout">
+
+    <!-- Camera Panel -->
+    <div class="cam-panel">
+
+      <div class="cam-header">
+        <div class="cam-title">
+          <div class="ind off" id="rec-dot"></div>
+          Viewfinder
+        </div>
+        <div class="cam-controls">
+          <button class="ctrl-btn" id="btn-start-cam" onclick="startCamera()">Enable Camera</button>
+          <button class="ctrl-btn danger" id="btn-stop-cam" onclick="stopCamera()" style="display:none">Stop Cam</button>
+        </div>
+      </div>
+
+      <div class="viewfinder-wrap" id="viewfinder-wrap">
+        <div class="corner tl"></div>
+        <div class="corner tr"></div>
+        <div class="corner bl"></div>
+        <div class="corner br"></div>
+        <div class="crosshair"></div>
+        <div class="flash-overlay" id="flash"></div>
+        <div class="shutter-ring" id="shutter-ring"></div>
+        <div class="processing-bar" id="progress-bar"></div>
+        <div class="cmd-badge" id="cmd-badge"></div>
+
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="snapshot-canvas"></canvas>
+
+        <div class="cam-off-msg" id="cam-off-msg">
+          <div class="cam-off-icon">📷</div>
+          <div class="cam-off-txt">Camera not active<br/>Click "Enable Camera" to start</div>
+        </div>
+      </div>
+
+      <div class="cam-footer">
+        <div class="cam-facingbtn">
+          <button class="face-btn active" id="btn-rear" onclick="switchFacing('environment')">📷 Rear</button>
+          <button class="face-btn" id="btn-front" onclick="switchFacing('user')">🤳 Front</button>
+        </div>
+        <button class="manual-capture-btn" id="btn-manual" onclick="captureAndUpload('manual')" disabled>
+          📸 Capture Now
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Side Panel -->
+    <div class="side-panel">
+
+      <!-- Device Info -->
+      <div>
+        <div class="s-label">Device Info</div>
+        <div class="info-grid" id="device-info">
+          <div class="info-row"><span class="info-key">Browser</span><span class="info-val" id="di-browser">—</span></div>
+          <div class="info-row"><span class="info-key">Platform</span><span class="info-val" id="di-platform">—</span></div>
+          <div class="info-row"><span class="info-key">Resolution</span><span class="info-val" id="di-res">—</span></div>
+          <div class="info-row"><span class="info-key">Camera</span><span class="info-val" id="di-cam">Not started</span></div>
+          <div class="info-row"><span class="info-key">Facing</span><span class="info-val" id="di-facing">—</span></div>
+        </div>
+      </div>
+
+      <!-- Last Capture Preview -->
+      <div>
+        <div class="s-label">Last Capture</div>
+        <div class="preview-wrap">
+          <div class="preview-header">
+            <span id="preview-time">No capture yet</span>
+            <span id="preview-cam-tag" style="color:var(--blue)"></span>
+          </div>
+          <div class="preview-body">
+            <img id="preview-img" src="" alt="Preview" />
+            <div class="preview-empty" id="preview-empty">Awaiting first capture</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Config -->
+      <div>
+        <div class="s-label">Configuration</div>
+        <div class="cfg-field">
+          <div class="cfg-lbl">Firestore Collection</div>
+          <input class="cfg-inp" id="col-input" type="text" value="commands" placeholder="commands" />
+        </div>
+      </div>
+
+      <!-- Activity Log -->
+      <div style="flex:1;display:flex;flex-direction:column;min-height:120px;">
+        <div class="s-label">Activity Log</div>
+        <div class="log-wrap" style="flex:1">
+          <div class="log-head">
+            <span>Events</span>
+            <button class="btn-clr" onclick="clearLog()">Clear</button>
+          </div>
+          <div id="log-out"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- ═══ FIREBASE + APP LOGIC ═══ -->
+<script type="module">
+import { initializeApp }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, onSnapshot, serverTimestamp, deleteDoc }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
+// ── Firebase config ──────────────────────────────────────
+const firebaseConfig = {
+  apiKey:            "AIzaSyBblAnGXU1RlJsmh7kq_j8EknUnjfTnsOE",
+  authDomain:        "weber-e20ea.firebaseapp.com",
+  projectId:         "weber-e20ea",
+  storageBucket:     "weber-e20ea.firebasestorage.app",
+  messagingSenderId: "736413610937",
+  appId:             "1:736413610937:android:eb7ef89b94a4b045bfbc68"
+};
+
+const fbApp   = initializeApp(firebaseConfig);
+const auth    = getAuth(fbApp);
+const db      = getFirestore(fbApp);
+const storage = getStorage(fbApp);
+
+// ── State ─────────────────────────────────────────────────
+let stream          = null;
+let cmdListener     = null;
+let facingMode      = 'environment';
+let lastCmdId       = null;
+
+// ── Helpers ───────────────────────────────────────────────
+function log(msg, type = 'info') {
+  const out  = document.getElementById('log-out');
+  const time = new Date().toTimeString().slice(0,8);
+  const d    = document.createElement('div');
+  d.className = `ll ${type}`;
+  d.innerHTML = `<span class="lt">${time}</span><span class="lm">${msg}</span>`;
+  out.appendChild(d);
+  out.scrollTop = out.scrollHeight;
+}
+window.clearLog = () => { document.getElementById('log-out').innerHTML = ''; };
+
+function toast(msg, type = 'ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `show ${type}`;
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.className = '', 3200);
+}
+
+function setStatus(state, txt) {
+  const row = document.getElementById('status-row');
+  row.className = 'status-row ' + state;
+  document.getElementById('status-txt').textContent = txt;
+}
+
+function showCmdBadge(txt) {
+  const b = document.getElementById('cmd-badge');
+  b.textContent = txt;
+  b.classList.add('show');
+  setTimeout(() => b.classList.remove('show'), 3000);
+}
+
+function getCol() {
+  return document.getElementById('col-input').value.trim() || 'commands';
+}
+
+function getDeviceInfo() {
+  const ua = navigator.userAgent;
+  let browser = 'Unknown';
+  if (ua.includes('Chrome')) browser = 'Chrome ' + (ua.match(/Chrome\/([\d.]+)/)||[])[1];
+  else if (ua.includes('Firefox')) browser = 'Firefox';
+  else if (ua.includes('Safari')) browser = 'Safari';
+  return {
+    browser,
+    platform: navigator.platform || navigator.userAgentData?.platform || 'Web',
+    resolution: `${screen.width}×${screen.height}`,
+    language: navigator.language
+  };
+}
+
+// ── Populate device info panel ────────────────────────────
+function populateDeviceInfo() {
+  const d = getDeviceInfo();
+  document.getElementById('di-browser').textContent   = d.browser;
+  document.getElementById('di-platform').textContent  = d.platform;
+  document.getElementById('di-res').textContent       = d.resolution;
+}
+
+// ── Camera ────────────────────────────────────────────────
+async function startCamera(facing) {
+  if (facing) facingMode = facing;
+  if (stream) stream.getTracks().forEach(t => t.stop());
+
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: false
+    });
+    const video = document.getElementById('video');
+    video.srcObject = stream;
+    video.style.display = 'block';
+    video.classList.toggle('rear', facingMode === 'environment');
+    document.getElementById('cam-off-msg').style.display = 'none';
+    document.getElementById('btn-start-cam').style.display = 'none';
+    document.getElementById('btn-stop-cam').style.display = '';
+    document.getElementById('btn-manual').disabled = false;
+    document.getElementById('rec-dot').classList.remove('off');
+
+    // Update info
+    const track = stream.getVideoTracks()[0];
+    const settings = track.getSettings();
+    document.getElementById('di-cam').textContent   = track.label || 'Camera';
+    document.getElementById('di-facing').textContent = facingMode === 'user' ? 'Front' : 'Rear';
+
+    setStatus('listening', 'LISTENING FOR COMMANDS');
+    log(`Camera started: ${track.label || facingMode}`, 'ok');
+    toast('Camera active', 'ok');
+  } catch (e) {
+    log(`Camera error: ${e.message}`, 'err');
+    toast('Camera access denied: ' + e.message, 'err');
+  }
+}
+window.startCamera = () => startCamera(facingMode);
+
+function stopCamera() {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null;
+  const video = document.getElementById('video');
+  video.srcObject = null;
+  video.style.display = 'none';
+  document.getElementById('cam-off-msg').style.display = 'flex';
+  document.getElementById('btn-start-cam').style.display = '';
+  document.getElementById('btn-stop-cam').style.display = 'none';
+  document.getElementById('btn-manual').disabled = true;
+  document.getElementById('rec-dot').classList.add('off');
+  document.getElementById('di-cam').textContent   = 'Not started';
+  document.getElementById('di-facing').textContent = '—';
+  setStatus('', 'CAMERA STOPPED');
+  log('Camera stopped', 'warn');
+}
+window.stopCamera = stopCamera;
+
+window.switchFacing = async (f) => {
+  facingMode = f;
+  document.getElementById('btn-rear').classList.toggle('active', f === 'environment');
+  document.getElementById('btn-front').classList.toggle('active', f === 'user');
+  if (stream) await startCamera(f);
+  log(`Switched to ${f === 'user' ? 'front' : 'rear'} camera`, 'info');
+};
+
+// ── Capture ───────────────────────────────────────────────
+async function captureSnapshot() {
+  const video  = document.getElementById('video');
+  const canvas = document.getElementById('snapshot-canvas');
+  canvas.width  = video.videoWidth  || 1280;
+  canvas.height = video.videoHeight || 720;
+  const ctx = canvas.getContext('2d');
+
+  // Mirror front cam
+  if (facingMode === 'user') {
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+  }
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  // Flash
+  const flash = document.getElementById('flash');
+  flash.classList.add('flash');
+  setTimeout(() => flash.classList.remove('flash'), 200);
+
+  // Shutter ring
+  const ring = document.getElementById('shutter-ring');
+  ring.classList.remove('fire');
+  void ring.offsetWidth;
+  ring.classList.add('fire');
+
+  return new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.88));
+}
+
+async function uploadBlob(blob, filename) {
+  const r = storageRef(storage, `remotecam-captures/${filename}`);
+  await uploadBytes(r, blob, { contentType: 'image/jpeg' });
+  return getDownloadURL(r);
+}
+
+async function writeResponse(payload) {
+  const ref = doc(db, getCol(), '__response__');
+  await setDoc(ref, { ...payload, timestamp: serverTimestamp() });
+}
+
+async function captureAndUpload(source = 'remote') {
+  if (!stream) {
+    toast('Camera not active — enable camera first', 'err');
+    return;
+  }
+
+  setStatus('busy', 'CAPTURING…');
+  document.getElementById('progress-bar').classList.add('show');
+  log(`📸 Capturing (${source})…`, 'cmd');
+
+  try {
+    const blob = await captureSnapshot();
+    log('Image captured — uploading…', 'info');
+
+    const ts       = Date.now();
+    const filename = `capture_${ts}_${facingMode}.jpg`;
+    const url      = await uploadBlob(blob, filename);
+    log(`Uploaded → ${filename}`, 'ok');
+
+    // Show local preview
+    const prevImg = document.getElementById('preview-img');
+    prevImg.src = URL.createObjectURL(blob);
+    prevImg.style.display = 'block';
+    document.getElementById('preview-empty').style.display = 'none';
+    document.getElementById('preview-time').textContent = new Date().toLocaleTimeString();
+    document.getElementById('preview-cam-tag').textContent =
+      facingMode === 'user' ? 'FRONT' : 'REAR';
+
+    // Write response
+    const di = getDeviceInfo();
+    await writeResponse({
+      command:     'CAPTURE_CAMERA',
+      status:      'ok',
+      imageUrl:    url,
+      camera:      facingMode === 'user' ? 'front' : 'back',
+      deviceModel: di.platform + ' / ' + di.browser,
+      sentFrom:    'device-app',
+      androidVer:  di.browser
+    });
+
+    setStatus('listening', 'LISTENING FOR COMMANDS');
+    toast('Photo sent to dashboard!', 'ok');
+    log('✓ Response written to Firestore', 'ok');
+
+  } catch (e) {
+    log(`✗ Capture failed: ${e.message}`, 'err');
+    toast('Capture failed: ' + e.message, 'err');
+    setStatus('listening', 'LISTENING FOR COMMANDS');
+  } finally {
+    document.getElementById('progress-bar').classList.remove('show');
+  }
+}
+window.captureAndUpload = captureAndUpload;
+
+// ── Command listener ──────────────────────────────────────
+function startCommandListener() {
+  if (cmdListener) cmdListener();
+
+  const ref = doc(db, getCol(), '__active__');
+  cmdListener = onSnapshot(ref, async snap => {
+    if (!snap.exists()) return;
+
+    const data = snap.data();
+    const cmd  = data.command;
+    const id   = data.timestamp?.nanoseconds + '' + data.timestamp?.seconds;
+
+    // Deduplicate — don't re-execute same command
+    if (id && id === lastCmdId) return;
+    lastCmdId = id;
+
+    // Only react to pending commands
+    if (data.status !== 'pending') return;
+
+    log(`⬇ Received: ${cmd}`, 'cmd');
+    showCmdBadge(cmd.replace('_', ' '));
+
+    const di = getDeviceInfo();
+    const basePayload = {
+      deviceModel: di.platform + ' / ' + di.browser,
+      sentFrom:    'device-app',
+      androidVer:  di.browser
+    };
+
+    if (cmd === 'CAPTURE_CAMERA') {
+      const requestedCam = data.payload?.camera || 'back';
+      const newFacing = requestedCam === 'front' ? 'user' : 'environment';
+
+      // Switch camera if needed
+      if (newFacing !== facingMode) {
+        facingMode = newFacing;
+        document.getElementById('btn-rear').classList.toggle('active', newFacing === 'environment');
+        document.getElementById('btn-front').classList.toggle('active', newFacing === 'user');
+        if (stream) {
+          await startCamera(newFacing);
+          // Wait for camera to warm up
+          await new Promise(r => setTimeout(r, 800));
+        }
+      }
+
+      if (!stream) {
+        // Auto-start camera
+        await startCamera(newFacing);
+        await new Promise(r => setTimeout(r, 1200));
+      }
+
+      await captureAndUpload('remote');
+
+    } else if (cmd === 'PING') {
+      log('◉ PING received — sending pong', 'ok');
+      setStatus('busy', 'PONG!');
+      await writeResponse({ command: 'PING', status: 'pong', ...basePayload });
+      setTimeout(() => setStatus('listening', 'LISTENING FOR COMMANDS'), 1500);
+      toast('Pinged by dashboard!', 'warn');
+
+    } else if (cmd === 'LOG_STATUS') {
+      log('≡ Status request received', 'info');
+      await writeResponse({
+        command:    'LOG_STATUS',
+        status:     'ok',
+        cameraOn:   !!stream,
+        facing:     facingMode,
+        resolution: di.resolution,
+        language:   di.language,
+        ...basePayload
+      });
+      toast('Status sent to dashboard', 'ok');
+      log('✓ Status written', 'ok');
+
+    } else {
+      log(`Unknown command: ${cmd}`, 'warn');
+      await writeResponse({ command: cmd, status: 'unknown', ...basePayload });
+    }
+  }, err => {
+    log(`Listener error: ${err.message}`, 'err');
+  });
+}
+
+// ── Auth ──────────────────────────────────────────────────
+document.getElementById('btn-google-login').addEventListener('click', async () => {
+  try {
+    await signInWithPopup(auth, new GoogleAuthProvider());
+  } catch (e) {
+    toast('Sign-in failed: ' + e.message, 'err');
+  }
+});
+
+document.getElementById('btn-signout').addEventListener('click', () => signOut(auth));
+
+onAuthStateChanged(auth, user => {
+  if (user) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    document.getElementById('user-name').textContent = user.displayName;
+    document.getElementById('user-avatar').src = user.photoURL || '';
+    populateDeviceInfo();
+    setStatus('', 'READY — ENABLE CAMERA');
+    startCommandListener();
+    log(`Signed in as ${user.displayName}`, 'ok');
+    log('Listening for commands from dashboard…', 'info');
+    toast('Device connected!', 'ok');
+  } else {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+    if (cmdListener) { cmdListener(); cmdListener = null; }
+    stopCamera();
+  }
+});
+
+// Re-subscribe when collection changes
+document.getElementById('col-input').addEventListener('change', () => {
+  if (auth.currentUser) {
+    log(`Collection → ${getCol()}`, 'warn');
+    startCommandListener();
+  }
+});
+
+log('Device app ready — sign in to begin', 'info');
+</script>
+
+<!-- Firebase Storage SDK (needed separately) -->
+<script type="module">
+// Already imported above via top-level module
+</script>
+</body>
+</html>
